@@ -1,8 +1,9 @@
 name: release
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - master
+      - main
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -16,7 +17,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version-file: 'go.mod'
+          cache: true
 
       - name: Import GPG key
         id: import_gpg
@@ -25,11 +27,23 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
+      - name: Run Semantic Release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v3
+        with:
+          extra_plugins: |
+            @semantic-release/changelog@3.0.0
+            @semantic-release/git
+            @semantic-release/exec
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run GoReleaser
+        if: steps.semantic.outputs.new_release_published == 'true'
         uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
-          args: release --rm-dist
+          args: release --release-notes /tmp/release-notes.md --rm-dist
         env:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           # GitHub sets this automatically
